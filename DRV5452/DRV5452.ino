@@ -4,19 +4,20 @@
 //
 #include <M5Stack.h>
 
-const uint8_t	nResBits	= 8;		// PWMに使用するビット数　n=1～16[bit]
+#define	DUTY_BITS	8
+#define	FREQ_PWM	160000.0
+#define	MAX_FREQ_PWM	160000.0
+#define	MIN_FREQ_PWM	40000.0
 										// PWM周波数の最大値 Maxfreq = 80000000.0/2^n[Hz] = 312500[Hz]
-const uint8_t	PWM_CH		= 2;		// PWMチャンネル
-const uint8_t	PWM_PIN		= 2;		// PWM出力に使用するGPIO PIN番号
-const uint8_t	EN_PIN		= 3;		
-const uint8_t	DIR_PIN		= 1;		
+#define	PWM_CH		2	// PWMチャンネル
+#define	PWM_PIN		2	// PWM出力に使用するGPIO PIN番号
+#define	NSLEEP_PIN	5
+#define	EN_PIN		16	
+#define	DIR_PIN		17	
 
-
-const int g_nDutyPWM		= 128;		// デューティ n / 255
-const double MaxFreePWM		= 160000.0;	//
-const double MinFreePWM		= 40000.0;	//
-double	g_nFreqPWM			= MinFreePWM;	//
-bool g_bEnable				= false;
+const int g_nDutyPWM	= 128;		// デューティ n / 255
+double	g_nFreqPWM		= MIN_FREQ_PWM;	//
+bool g_bEnable			= false;
 
 ////////////////////////////////////////
 //
@@ -32,6 +33,8 @@ void DisplayValue()
 	M5.Lcd.print("Frequency");
 	M5.Lcd.setCursor(10, 120);
 	M5.Lcd.printf("  %.1f	", g_nFreqPWM);
+	M5.Lcd.setCursor(10, 160);
+	M5.Lcd.printf("EN %s",  g_bEnable ? "ON " : "OFF");
 }
 
 ////////////////////////////////////////
@@ -48,11 +51,16 @@ void setup()
 	DisplayValue();
 
 	pinMode(PWM_PIN,	OUTPUT); 
+	pinMode(NSLEEP_PIN,	OUTPUT); 
 	pinMode(EN_PIN,		OUTPUT); 
 	pinMode(DIR_PIN,	OUTPUT); 
 
+	digitalWrite(NSLEEP_PIN, HIGH);
+	digitalWrite(EN_PIN, LOW);
+	digitalWrite(DIR_PIN, LOW);
+
 	// チャンネルと周波数の分解能を設定
-	ledcSetup(PWM_CH, g_nFreqPWM, nResBits);
+	ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
 
 	// PWM出力ピンとチャンネルの設定
 	ledcAttachPin(PWM_PIN, PWM_CH);
@@ -66,6 +74,7 @@ void setup()
 void loop()
 {
 	int nLastFreqPWM = g_nFreqPWM;
+	bool bLastEnable = g_bEnable;
 
 	//static int ValueIndex = 0;
 	M5.update();
@@ -73,8 +82,8 @@ void loop()
 	if (M5.BtnA.wasPressed()) {
 		g_nFreqPWM += 10000.0;
 
-		if (g_nFreqPWM > MaxFreePWM)
-			g_nFreqPWM = MaxFreePWM;
+		if (g_nFreqPWM > MAX_FREQ_PWM)
+			g_nFreqPWM = MAX_FREQ_PWM;
 
 		Serial.printf("%.1f\r\n", g_nFreqPWM);
 	}
@@ -92,11 +101,14 @@ void loop()
 	if (M5.BtnC.wasPressed()) {
 		g_nFreqPWM -= 10000.0;
 
-		if (g_nFreqPWM < MinFreePWM)
-			g_nFreqPWM = MinFreePWM;
+		if (g_nFreqPWM < MIN_FREQ_PWM)
+			g_nFreqPWM = MIN_FREQ_PWM;
 
 		Serial.printf("%.1f\r\n", g_nFreqPWM);
 	}
+
+	if (bLastEnable != g_bEnable)
+		DisplayValue();
 
 	if (nLastFreqPWM != g_nFreqPWM) {
 
@@ -107,7 +119,7 @@ void loop()
 		DisplayValue();
 
 		// チャンネルと周波数を更新
-		ledcSetup(PWM_CH, g_nFreqPWM, nResBits);
+		ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
 
 		// 出力再開
 		ledcWrite(PWM_CH, g_nDutyPWM);
