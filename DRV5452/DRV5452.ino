@@ -4,10 +4,10 @@
 //
 #include <M5Stack.h>
 
-#define	DUTY_BITS	8
-#define	FREQ_PWM	160000.0
-#define	MAX_FREQ_PWM	160000.0
-#define	MIN_FREQ_PWM	40000.0
+#define	DUTY_BITS		8
+#define	MAX_FREQ_PWM	320000.0
+#define	MIN_FREQ_PWM	10000.0
+#define	DUTY_VALUE		128
 										// PWM周波数の最大値 Maxfreq = 80000000.0/2^n[Hz] = 312500[Hz]
 #define	PWM_CH		2	// PWMチャンネル
 #define	PWM_PIN		2	// PWM出力に使用するGPIO PIN番号
@@ -15,7 +15,6 @@
 #define	EN_PIN		16	
 #define	DIR_PIN		17	
 
-const int g_nDutyPWM	= 128;		// デューティ n / 255
 double	g_nFreqPWM		= MIN_FREQ_PWM;	//
 bool g_bEnable			= false;
 
@@ -26,13 +25,13 @@ void DisplayValue()
 	M5.Lcd.setCursor(10, 0);
 	M5.Lcd.setTextSize(3);
 //	M5.Lcd.setTextFont(3);
-	M5.Lcd.print("Duty Value");
-	M5.Lcd.setCursor(10, 40);
-	M5.Lcd.printf("  %d / 255   ", g_nDutyPWM);
-	M5.Lcd.setCursor(10, 80);
 	M5.Lcd.print("Frequency");
+	M5.Lcd.setCursor(10, 40);
+	M5.Lcd.printf("  %6.0f pps ", g_nFreqPWM);
+	M5.Lcd.setCursor(10, 80);
+	M5.Lcd.print("RPM");
 	M5.Lcd.setCursor(10, 120);
-	M5.Lcd.printf("  %.1f	", g_nFreqPWM);
+	M5.Lcd.printf("  %6.0f rpm ", (g_nFreqPWM * 60 / 6400));
 	M5.Lcd.setCursor(10, 160);
 	M5.Lcd.printf("EN %s",  g_bEnable ? "ON " : "OFF");
 }
@@ -60,13 +59,13 @@ void setup()
 	digitalWrite(DIR_PIN, LOW);
 
 	// チャンネルと周波数の分解能を設定
-	ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
+	ledcSetup(PWM_CH, 0, DUTY_BITS);
 
 	// PWM出力ピンとチャンネルの設定
 	ledcAttachPin(PWM_PIN, PWM_CH);
 
 	// デューティーの設定と出力開始
-	ledcWrite(PWM_CH, g_nDutyPWM);
+	ledcWrite(PWM_CH, DUTY_VALUE);
 }
 
 ////////////////////////////////////////
@@ -89,11 +88,14 @@ void loop()
 	}
 
 	if (M5.BtnB.wasPressed()) {
-		if (g_bEnable)
+		if (g_bEnable) {
 			g_bEnable = false;
+			ledcSetup(PWM_CH, 0, DUTY_BITS);
 
-		else
+		} else {
 			g_bEnable = true;
+			ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
+		}
 
 		digitalWrite(EN_PIN, g_bEnable ? HIGH : LOW);
 	}
@@ -119,9 +121,12 @@ void loop()
 		DisplayValue();
 
 		// チャンネルと周波数を更新
-		ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
+		if (g_bEnable)
+			ledcSetup(PWM_CH, g_nFreqPWM, DUTY_BITS);
+		else
+			ledcSetup(PWM_CH, 0, DUTY_BITS);
 
 		// 出力再開
-		ledcWrite(PWM_CH, g_nDutyPWM);
+//		ledcWrite(PWM_CH, DUTY_VALUE);
 	}
 }
